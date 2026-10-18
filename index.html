@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Permissions-Policy" content="geolocation=(self)">
+<title>Markhor Locator — Pakistan Cell ID / BTS Finder</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --bg:#07101d;--card:#111d2e;--field:#07111f;--line:#29415f;--text:#e8eef8;
+  --muted:#9aabc2;--green:#12a56f;--blue:#1769e0;--red:#bd3450;--gold:#a76b00;
+  --accent:#00c9a7;--markhor:#c9a227;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#070e19,#0a1422);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+main{max-width:960px;margin:auto;padding:16px}
+.hero{padding:10px 4px 20px;text-align:center}
+.hero h1{font-size:28px;margin:6px 0;color:var(--markhor);letter-spacing:.5px}
+.hero p{color:var(--muted);margin:6px 0 10px}
+.pill{display:inline-block;padding:5px 10px;border-radius:99px;background:#183454;color:#b9d8ff;margin:3px;font-size:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin:14px 0;box-shadow:0 8px 28px #0004}
+.card h2{font-size:19px;margin:0 0 14px;display:flex;align-items:center;gap:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+label{display:block;color:var(--muted);font-size:13px;margin:8px 0 5px}
+input,select,button,textarea{width:100%;min-height:46px;border-radius:12px;border:1px solid #304664;background:var(--field);color:var(--text);padding:10px 12px;font-size:15px}
+button{font-weight:700;cursor:pointer;background:#183454;transition:.15s}
+button:hover{filter:brightness(1.12)}
+button.primary{background:var(--green)}button.blue{background:var(--blue)}button.red{background:var(--red)}button.gold{background:var(--gold)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+@media(max-width:640px){.row{grid-template-columns:1fr}}
+.status{padding:12px;border-radius:12px;background:#071321;color:#c9d5e5;margin-top:10px;line-height:1.4}
+.ok{color:#59e0ad}.err{color:#ff879e}.warn{color:#ffd166}.small{font-size:13px;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.stat{background:#071321;border-radius:13px;padding:12px;text-align:center}
+.stat b{display:block;font-size:18px;margin-top:5px;word-break:break-all}
+#map{height:520px;border-radius:14px;overflow:hidden;margin-top:10px}
+#mapShell{position:relative}
+#mapShell.map-expanded{position:fixed;inset:0;z-index:9999;background:#07101d;padding:0}
+#mapShell.map-expanded #map{height:100%;margin:0;border-radius:0}
+#mapExit{display:none;position:absolute;top:14px;right:14px;z-index:1001;width:auto;background:var(--red)}
+#mapShell.map-expanded #mapExit{display:block}
+.overlay{position:absolute;left:12px;top:12px;z-index:1000;max-width:min(88vw,420px);padding:10px 12px;border:1px solid #49627f;border-radius:12px;background:#071321ee;box-shadow:0 4px 16px #0008;font-size:12px;pointer-events:none}
+.compass{width:190px;height:190px;border:2px solid #49627f;border-radius:50%;margin:15px auto;position:relative;background:#0a1625}
+.needle{position:absolute;left:50%;top:20px;width:4px;height:70px;background:#ff4f64;transform-origin:50% 75px;transform:translateX(-50%) rotate(0deg);border-radius:4px}
+.center{position:absolute;left:50%;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;transform:translate(-50%,-50%)}
+.dir{position:absolute;font-weight:700;font-size:13px}
+.n{top:7px;left:50%;transform:translateX(-50%)}.s{bottom:7px;left:50%;transform:translateX(-50%)}
+.e{right:9px;top:50%;transform:translateY(-50%)}.w{left:9px;top:50%;transform:translateY(-50%)}
+footer{color:#8092aa;font-size:12px;padding:18px 4px 36px;text-align:center;line-height:1.5}
+.logo{font-size:34px;line-height:1}
+</style>
+</head>
+<body>
+<main>
+<section class="hero">
+  <div class="logo">🐐</div>
+  <h1>Markhor Locator</h1>
+  <p>Pakistan Cell-ID / LAC / TAC • MCC-MNC • Live GPS • BTS Dataset • Direction + Smart Beep</p>
+  <span class="pill">HTTPS GPS</span>
+  <span class="pill">Keyless Open Cell</span>
+  <span class="pill">Jazz • Ufone • Telenor • Zong</span>
+  <span class="pill">XLSX / CSV Import</span>
+  <span class="pill">Hex ⇄ Dec</span>
+</section>
+
+<!-- Serving Cell -->
+<section class="card">
+  <h2>📡 Serving Cell</h2>
+  <div class="grid">
+    <div><label>MCC</label><input id="mcc" inputmode="numeric" value="410" placeholder="410"></div>
+    <div><label>MNC</label><input id="mnc" inputmode="numeric" value="01" placeholder="01 Jazz / 03 Ufone / 04 Zong / 06 Telenor / 07 Warid"></div>
+    <div><label>LAC / TAC</label><input id="lac" inputmode="numeric" value="50406" placeholder="e.g. 10249 or 32491"></div>
+    <div><label>Cell ID / ECI</label><input id="cid" inputmode="numeric" value="140605" placeholder="e.g. 35585 or Local Cell ID"></div>
+    <div><label>Radio</label>
+      <select id="radio">
+        <option value="GSM">2G — GSM</option>
+        <option value="UMTS">3G — UMTS</option>
+        <option value="LTE" selected>4G — LTE</option>
+        <option value="NR">5G — NR</option>
+        <option value="ALL">ALL — Auto Detect</option>
+      </select>
+    </div>
+    <div><label>Signal dBm (optional)</label><input id="ss" inputmode="numeric" placeholder="-85"></div>
+    <div><label>IMEI (optional — model via TAC)</label><input id="imei" inputmode="numeric" placeholder="15-digit IMEI (first 14 digits used)"></div>
+    <div><label>IMSI (optional)</label><input id="imsi" inputmode="numeric" placeholder="IMSI if available"></div>
+  </div>
+  <div class="row">
+    <button class="blue" id="lookup">🧠 Analyze Cell / Location</button>
+    <button class="gold" id="example">🧪 Example (Jazz)</button>
+  </div>
+  <div class="status" id="cellStatus">Enter MCC, MNC, LAC and Cell ID, then Analyze. Local dataset is checked first.</div>
+</section>
+
+<!-- Public Evidence -->
+<section class="card">
+  <h2>🔎 Public Cell Evidence</h2>
+  <div class="small">Exact-cell lookup first. If not found, nearby public records can be used as estimates (clearly labelled).</div>
+  <div class="row">
+    <button id="publicLookup" class="blue">🌐 Query Public Cell Databases</button>
+    <button id="cellMapper" class="gold">🗺️ Open CellMapper</button>
+  </div>
+  <div class="status" id="publicEvidence">No public-cell query performed yet.</div>
+  <div id="publicMatches"></div>
+</section>
+
+<!-- Live GPS -->
+<section class="card">
+  <h2>📍 Reference / Live GPS</h2>
+  <div class="grid">
+    <div><label>Reference Latitude</label><input id="refLat" inputmode="decimal" placeholder="24.8607"></div>
+    <div><label>Reference Longitude</label><input id="refLon" inputmode="decimal" placeholder="67.0011"></div>
+  </div>
+  <div class="row">
+    <button class="primary" id="startGps">📡 Start Live GPS</button>
+    <button class="red" id="stopGps">⛔ Stop GPS</button>
+  </div>
+  <div class="row">
+    <button id="onceGps">📍 Use Current GPS Once</button>
+    <button id="clearRef">🧹 Clear Reference</button>
+  </div>
+  <div class="status" id="gpsStatus">HTTPS GPS ready. Press Start Live GPS and allow Location.</div>
+  <div class="status" id="gpsQuality">GPS quality: waiting for a fix.</div>
+</section>
+
+<!-- Known Tower Lock -->
+<section class="card">
+  <h2>🔒 Known Tower / Cell Lock</h2>
+  <div class="grid">
+    <div><label>Known Tower Latitude</label><input id="towerLat" inputmode="decimal" value="24.890422"></div>
+    <div><label>Known Tower Longitude</label><input id="towerLon" inputmode="decimal" value="67.062591"></div>
+  </div>
+  <div class="small">Use when you already know the tower/site coordinate from BTS sheet.</div>
+  <div class="row">
+    <button id="lockTower" class="primary">🔒 Lock Tower / Target</button>
+    <button id="clearTowerLock" class="red">🔓 Clear Lock</button>
+  </div>
+  <div class="status" id="towerLockStatus">Ready to lock the supplied tower coordinate.</div>
+</section>
+
+<!-- Location Result -->
+<section class="card">
+  <h2>🎯 Location Result</h2>
+  <div class="stats">
+    <div class="stat">Cell Latitude<b id="cellLat">—</b></div>
+    <div class="stat">Cell Longitude<b id="cellLon">—</b></div>
+    <div class="stat">LAC / TAC<b id="resultLac">—</b></div>
+    <div class="stat">Cell ID / ECI<b id="resultCid">—</b></div>
+    <div class="stat">eNB / Sector<b id="resultEnb">—</b></div>
+    <div class="stat">Distance<b id="distance">—</b></div>
+    <div class="stat">Accuracy / Range<b id="accuracy">—</b></div>
+    <div class="stat">Bearing<b id="bearing">—</b></div>
+    <div class="stat">Direction<b id="direction">—</b></div>
+  </div>
+  <div class="status" id="place">Place: —</div>
+  <div class="row">
+    <button id="copyLocation">📋 Copy Location Details</button>
+    <button id="saveObservation" class="primary">💾 Save Observation</button>
+  </div>
+  <div class="row">
+    <button id="exportCsv">📥 Export CSV</button>
+    <button id="printReport">📄 Print / Save Report</button>
+  </div>
+  <div class="status" id="lockStatus">🔒 Cell lookup will center the map on the estimated cell location.</div>
+</section>
+
+<!-- Map -->
+<section class="card">
+  <h2>🗺️ Live Map + Address + Towers</h2>
+  <div class="row">
+    <button id="centerGps">📍 Center GPS</button>
+    <button id="centerCell">🎯 Center Cell</button>
+  </div>
+  <div class="row">
+    <button id="street">🚶 Street View</button>
+    <button id="google">🗺️ Google Maps</button>
+  </div>
+  <div class="row">
+    <button id="directions" class="primary">🧭 Open Direction</button>
+    <button id="mapApp">📱 Open Map App</button>
+  </div>
+  <div class="row">
+    <button id="unlockMap">🔓 Unlock Map View</button>
+    <button id="towerLoad" class="blue">📡 Load Nearby Towers</button>
+  </div>
+  <div class="row">
+    <button id="mapFull">⛶ Full Map</button>
+  </div>
+  <div id="mapShell">
+    <div id="map"></div>
+    <div class="overlay" id="mapOverlay">📍 No cell location loaded</div>
+    <button id="mapExit">✕ Exit Full Map</button>
+  </div>
+  <div class="status" id="mapAddress">Esri Street Map is default. Switch layers from the map control.</div>
+  <div class="small">Cell-ID coordinates are estimates. Public tower mapping is incomplete.</div>
+</section>
+
+<!-- Direction + Beep -->
+<section class="card">
+  <h2>🧭 Direction + Smart Beep</h2>
+  <div class="compass">
+    <span class="dir n">N</span><span class="dir e">E</span><span class="dir s">S</span><span class="dir w">W</span>
+    <div class="needle" id="needle"></div>
+    <div class="center"></div>
+  </div>
+  <div class="row">
+    <button id="beepOn" class="primary">🔊 Beep ON</button>
+    <button id="beepOff" class="red">🔇 Beep OFF</button>
+  </div>
+  <div class="status" id="beepStatus">Beep points toward the estimated cell target (faster when closer).</div>
+</section>
+
+<!-- Operator Dataset -->
+<section class="card">
+  <h2>📡 Operator Cell-Site Dataset</h2>
+  <div class="small">Import Jazz/Mobilink, Warid, Telenor, Ufone/PTML and Zong Excel/CSV files. Exact MCC/MNC/LAC/Cell matches are checked first.</div>
+  <input type="file" id="operatorFiles" accept=".xlsx,.xls,.csv" multiple style="margin-top:10px">
+  <div class="row">
+    <button id="clearOperatorDb" class="red">🧹 Clear Imported Dataset</button>
+    <button id="showDatasetSites" class="blue">📍 Show Nearby Dataset Sites</button>
+  </div>
+  <div class="status" id="operatorDbStatus">0 operator records loaded. Load your BTS Excel files above.</div>
+</section>
+
+<!-- History -->
+<section class="card">
+  <h2>📅 Observation History</h2>
+  <div class="grid">
+    <div><label>Case / Reference Name</label><input id="caseName" placeholder="Case-001"></div>
+    <div><label>Observation Note</label><input id="caseNote" placeholder="Optional note"></div>
+  </div>
+  <div class="status" id="historyStatus">No saved observations.</div>
+  <div id="historyList"></div>
+</section>
+
+<!-- Advanced Evidence -->
+<section class="card">
+  <h2>🧩 Advanced Evidence (Local Only)</h2>
+  <div class="grid">
+    <div><label>IMSI (local only)</label><input id="imsi" inputmode="numeric"></div>
+    <div><label>IMEI (local only)</label><input id="imei" inputmode="numeric"></div>
+    <div><label>Timing Advance</label><input id="ta" inputmode="numeric"></div>
+    <div><label>Neighbour Cell IDs</label><input id="neighbors" placeholder="Comma separated"></div>
+  </div>
+  <div class="status" id="evidenceStatus">IMSI/IMEI stay on this device and are never sent to public lookup services.</div>
+</section>
+
+<!-- Converter -->
+<section class="card">
+  <h2>🔢 Cell ID / LAC Converter</h2>
+  <div class="grid">
+    <div><label>HEX Cell ID</label><input id="hexCid"></div>
+    <div><label>DEC Cell ID</label><input id="decCid"></div>
+    <div><label>HEX LAC/TAC</label><input id="hexLac"></div>
+    <div><label>DEC LAC/TAC</label><input id="decLac"></div>
+  </div>
+  <div class="row">
+    <button id="hexToDec" class="blue">⬇️ HEX → DEC</button>
+    <button id="decToHex" class="gold">⬆️ DEC → HEX</button>
+  </div>
+  <div class="row">
+    <button id="hexLacToDec">⬇️ LAC HEX → DEC</button>
+    <button id="decLacToHex">⬆️ LAC DEC → HEX</button>
+  </div>
+  <div class="status" id="convertStatus">Enter a value.</div>
+</section>
+
+<footer>
+  GPS requires HTTPS and browser permission. For best accuracy use a phone outdoors.<br>
+  Cell-ID results are estimated and should not be presented as exact handset GPS.<br>
+  Markhor Locator — built for Pakistan BTS / Cell-ID field work.
+</footer>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+let cell=null,gps=null,gpsSamples=[],watch=null,beep=false,beepTimer=null,audioCtx=null,operatorDb=[];
+
+const map=L.map('map',{preferCanvas:true}).setView([24.890422,67.062591],17);
+const road=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'}).addTo(map);
+const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri'});
+const osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'});
+let gpsMarker=null,cellMarker=null,line=null,accCircle=null,towerLayer=L.layerGroup().addTo(map),datasetLayer=L.layerGroup().addTo(map),mapLocked=false;
+L.control.layers({Esri:road,Satellite:sat,OSM:osm},{'📡 Towers':towerLayer,'📍 Dataset Sites':datasetLayer}).addTo(map);
+
+function hav(a,b,c,d){const R=6371000,p=Math.PI/180,x=(c-a)*p,y=(d-b)*p,q=Math.sin(x/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(q))}
+function bear(a,b,c,d){const p=Math.PI/180,y=Math.sin((d-b)*p)*Math.cos(c*p),x=Math.cos(a*p)*Math.sin(c*p)-Math.sin(a*p)*Math.cos(c*p)*Math.cos((d-b)*p);return(Math.atan2(y,x)/p+360)%360}
+function dir(x){return['N','NE','E','SE','S','SW','W','NW'][Math.round(x/45)%8]}
+function quality(a){return a<=20?'<span class="ok">HIGH</span>':a<=50?'<span class="ok">GOOD</span>':a<=100?'<span class="warn">MODERATE</span>':'<span class="err">POOR</span>'}
+
+function got(pos){
+  const c=pos.coords,s={lat:c.latitude,lon:c.longitude,accuracy:Number.isFinite(c.accuracy)?c.accuracy:999999,timestamp:pos.timestamp||Date.now()};
+  gpsSamples.push(s);gpsSamples=gpsSamples.filter(x=>Date.now()-x.timestamp<30000).slice(-12);
+  const best=gpsSamples.reduce((a,b)=>b.accuracy<a.accuracy?b:a,s);
+  gps={lat:best.lat,lon:best.lon,accuracy:best.accuracy};
+  $('refLat').value=gps.lat.toFixed(7);$('refLon').value=gps.lon.toFixed(7);
+  $('gpsStatus').innerHTML='<span class="ok">GPS: '+gps.lat.toFixed(7)+', '+gps.lon.toFixed(7)+' • ±'+Math.round(gps.accuracy)+' m</span>';
+  $('gpsQuality').innerHTML='GPS quality: '+quality(gps.accuracy)+' • '+gpsSamples.length+' sample(s)';
+  if(!mapLocked)updateMap();calc();
+}
+function geo(){if(!window.isSecureContext){$('gpsStatus').innerHTML='<span class="err">GPS requires HTTPS.</span>';return false}if(!navigator.geolocation){$('gpsStatus').innerHTML='<span class="err">Geolocation not available.</span>';return false}return true}
+$('startGps').onclick=()=>{if(!geo())return;gpsSamples=[];$('gpsStatus').textContent='Requesting high-accuracy GPS…';if(watch!==null)navigator.geolocation.clearWatch(watch);watch=navigator.geolocation.watchPosition(got,e=>$('gpsStatus').innerHTML='<span class="err">'+(e.code===1?'Permission denied.':e.code===2?'Unavailable.':e.code===3?'Timeout.':e.message)+'</span>',{enableHighAccuracy:true,maximumAge:0,timeout:30000})};
+$('onceGps').onclick=()=>{if(!geo())return;$('gpsStatus').textContent='Requesting GPS…';navigator.geolocation.getCurrentPosition(got,e=>$('gpsStatus').innerHTML='<span class="err">GPS error: '+e.message+'</span>',{enableHighAccuracy:true,maximumAge:0,timeout:30000})};
+$('stopGps').onclick=()=>{if(watch!==null){navigator.geolocation.clearWatch(watch);watch=null}$('gpsStatus').textContent='Live GPS stopped.'};
+$('clearRef').onclick=()=>{gps=null;gpsSamples=[];$('refLat').value='';$('refLon').value='';$('gpsQuality').textContent='GPS quality: cleared.'};
+
+function setCell(lat,lon,range,source,place='',meta={}){
+  cell={lat:+lat,lon:+lon,range:+range||0,source,place:place||'',mcc:$('mcc').value.trim(),mnc:$('mnc').value.trim(),lac:$('lac').value.trim(),cid:$('cid').value.trim(),operator:meta.operator||'',radio:meta.radio||$('radio').value,site:meta.site||'',azimuth:meta.azimuth??'',datasetSource:meta.source||'',samples:meta.samples||'',enb:Math.floor((+$('cid').value||0)/256),sector:(+$('cid').value||0)%256};
+  $('cellLat').textContent=cell.lat.toFixed(7);$('cellLon').textContent=cell.lon.toFixed(7);$('resultLac').textContent=cell.lac||'—';$('resultCid').textContent=cell.cid||'—';$('resultEnb').textContent=cell.enb+' / '+cell.sector;$('accuracy').textContent=cell.range?Math.round(cell.range)+' m':'—';
+  $('place').textContent='Place: '+(place||'not available')+' • Source: '+source+(cell.operator?' • Operator: '+cell.operator:'')+' • eNB '+cell.enb+' • Sector '+cell.sector;
+  mapLocked=true;updateMap(true);renderOverlay();calc();
+}
+function renderOverlay(){if(!cell)return;$('mapOverlay').innerHTML='<b>🔒 CELL TARGET</b><br>MCC '+cell.mcc+' • MNC '+cell.mnc+' • '+(cell.radio||'')+'<br>TAC/LAC '+cell.lac+' • ECI '+cell.cid+'<br>eNB '+cell.enb+' • Sector '+cell.sector+'<br>'+cell.lat.toFixed(7)+', '+cell.lon.toFixed(7)+(cell.operator?'<br>📡 '+cell.operator:'')+(cell.place?'<br>📌 '+cell.place:'')}
+function updateMap(fit=false){
+  if(!cell)return;
+  if(!cellMarker)cellMarker=L.marker([cell.lat,cell.lon]).addTo(map);
+  cellMarker.setLatLng([cell.lat,cell.lon]).bindPopup('<b>🔒 Cell / Tower Target</b><br>MCC '+cell.mcc+' / MNC '+cell.mnc+'<br>TAC/LAC '+cell.lac+'<br>ECI '+cell.cid+'<br>eNB '+cell.enb+' • Sector '+cell.sector+'<br>'+cell.lat.toFixed(7)+', '+cell.lon.toFixed(7)).bindTooltip('🔒 '+cell.lac+' / '+cell.cid,{permanent:true,direction:'top',offset:[0,-12]});
+  if(cell.range>0){if(!accCircle)accCircle=L.circle([cell.lat,cell.lon],{dashArray:'6 6'}).addTo(map);accCircle.setLatLng([cell.lat,cell.lon]).setRadius(cell.range)}else if(accCircle){accCircle.remove();accCircle=null}
+  if(gps){if(!gpsMarker)gpsMarker=L.marker([gps.lat,gps.lon]).addTo(map).bindPopup('🔵 Your GPS');gpsMarker.setLatLng([gps.lat,gps.lon]);if(!line)line=L.polyline([[gps.lat,gps.lon],[cell.lat,cell.lon]]).addTo(map);line.setLatLngs([[gps.lat,gps.lon],[cell.lat,cell.lon]])}
+  if(fit)map.setView([cell.lat,cell.lon],17,{animate:false});
+}
+
+function lockKnownTower(){
+  const lat=Number($('towerLat').value),lon=Number($('towerLon').value);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180){$('towerLockStatus').innerHTML='<span class="err">Enter valid latitude and longitude.</span>';return}
+  setCell(lat,lon,0,'Known tower/site coordinate','',{radio:$('radio').value});
+  $('towerLockStatus').innerHTML='<span class="ok">🔒 Target locked at '+lat.toFixed(7)+', '+lon.toFixed(7)+'.</span>';
+  $('lockStatus').innerHTML='<span class="ok">🔒 Locked. Use Direction / Google Maps to navigate.</span>';
+}
+$('lockTower').onclick=lockKnownTower;
+$('clearTowerLock').onclick=()=>{mapLocked=false;if(cellMarker){cellMarker.remove();cellMarker=null}if(accCircle){accCircle.remove();accCircle=null}if(line){line.remove();line=null}$('towerLockStatus').textContent='Tower lock cleared.';$('lockStatus').textContent='🔓 Target lock cleared.'};
+
+function calc(){if(!gps||!cell)return;const d=hav(gps.lat,gps.lon,cell.lat,cell.lon),b=bear(gps.lat,gps.lon,cell.lat,cell.lon);$('distance').textContent=d<1000?Math.round(d)+' m':(d/1000).toFixed(2)+' km';$('bearing').textContent=b.toFixed(1)+'°';$('direction').textContent=dir(b);$('needle').style.transform='translateX(-50%) rotate('+b+'deg)';scheduleBeep()}
+
+function clean(v){return String(v??'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function field(row,names){const keys=Object.keys(row);for(const n of names){const k=keys.find(x=>clean(x)===clean(n));if(k&&row[k]!==''&&row[k]!=null)return row[k]}for(const n of names){const w=clean(n),k=keys.find(x=>clean(x).includes(w));if(k&&row[k]!==''&&row[k]!=null)return row[k]}return''}
+
+function normalize(row,file,sheet){
+  const raw=(file+' '+sheet+' '+Object.values(row).join(' ')).toLowerCase();
+  const guessed=/mobilink|jazz/.test(raw)?{operator:'Jazz',mnc:'01'}:
+                /warid/.test(raw)?{operator:'Warid',mnc:'07'}:
+                /telenor/.test(raw)?{operator:'Telenor',mnc:'06'}:
+                /ufone|ptml/.test(raw)?{operator:'Ufone',mnc:'03'}:
+                /zong|cmpak/.test(raw)?{operator:'Zong',mnc:'04'}:
+                {operator:'Unknown',mnc:''};
+  const mcc=String(field(row,['MCC'])||'410').trim();
+  const mnc=String(field(row,['MNC','Operator MNC'])||guessed.mnc).trim().padStart(2,'0');
+  const lac=String(field(row,['LAC','LAC ID','TAC','LAC/TAC','Lac'])).trim();
+  const cid=String(field(row,['Cell ID','CellID','Cell ID/ECI','ECI','CID','3G Cell ID','Local Cell ID','CELL ID','Local Cell ID'])).trim();
+  const lat=Number(field(row,['Latitude','LATITUDE','Lat','LAT']));
+  const lon=Number(field(row,['Longitude','LONGITUDE','Lon','LONG','Long']));
+  if(!mnc||!lac||!cid||!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return null;
+  const rr=String(field(row,['Radio','Technology','RAT'])).toUpperCase();
+  const radio=/5G|NR/.test(rr)?'NR':/4G|LTE|ENODEB|TAC/.test(rr)||/4g/i.test(sheet)?'LTE':/3G|UMTS/.test(rr)||/3g/i.test(sheet)?'UMTS':'GSM';
+  const range=Number(field(row,['Range','Covered Area','Coverage Area']));
+  const az=Number(field(row,['Azimuth','Orientation','Bore']));
+  return {
+    mcc,mnc,lac,cid,lat,lon,
+    operator:guessed.operator,radio,
+    range:Number.isFinite(range)?range:0,
+    azimuth:Number.isFinite(az)?az:'',
+    site:String(field(row,['Site ID','Site Code','Site Name','SiteID','Sector Name','eNodeB Name'])).trim(),
+    source:file+(sheet?' • '+sheet:'')
+  };
+}
+
+function findOperator(mcc,mnc,lac,cid,radio){
+  const key=[mcc,String(mnc).padStart(2,'0'),lac,cid].join('|');
+  const hits=operatorDb.filter(x=>[x.mcc,String(x.mnc).padStart(2,'0'),x.lac,x.cid].join('|')===key);
+  return radio==='ALL'?(hits[0]||null):(hits.find(x=>x.radio===radio)||hits[0]||null);
+}
+
+function getModelFromImei(imei){
+  if(!imei || imei.length < 14) return null;
+  const tac = imei.replace(/\D/g,'').slice(0,8); // first 8 of TAC is usually enough
+  // Small common TAC map (expandable). Full lookup needs GSMA database.
+  const models = {
+    '353918':'Samsung Galaxy A series',
+    '358767':'Samsung Galaxy',
+    '352609':'Huawei',
+    '867400':'Xiaomi / Redmi',
+    '353325':'Nokia',
+    '359827':'Apple iPhone',
+    '354375':'Oppo / Realme'
+  };
+  return models[tac] || null;
+}
+
+function updateImeiModel(){
+  const imei = $('imei').value.trim();
+  const model = getModelFromImei(imei);
+  const status = $('cellStatus');
+  if(model){
+    status.innerHTML = (status.innerHTML || '') + '<br><span class="ok">📱 Model (from IMEI TAC): ' + model + '</span>';
+  }
+}
+
+async function analyze(){
+  const mcc=$('mcc').value.trim(),mnc=$('mnc').value.trim(),lac=$('lac').value.trim(),cid=$('cid').value.trim(),radio=$('radio').value;
+  if(!mcc||!mnc||!lac||!cid){$('cellStatus').innerHTML='<span class="err">MCC, MNC, LAC and Cell ID are required.</span>';return}
+  
+  $('cellStatus').innerHTML='<span class="warn">🔍 Searching...</span>';
+  
+  // 1. Check imported dataset first
+  const hit=findOperator(mcc,mnc,lac,cid,radio);
+  if(hit){
+    setCell(hit.lat,hit.lon,hit.range,'Imported operator dataset',hit.site,hit);
+    $('cellStatus').innerHTML='<span class="ok">✅ Exact dataset match • '+hit.operator+' • '+hit.radio+'</span>';
+    reverse(hit.lat,hit.lon);return;
+  }
+  
+  // 2. Try Mylnikov public API
+  const url='https://api.mylnikov.org/geolocation/cell?v=1.1&data=open&mcc='+encodeURIComponent(mcc)+'&mnc='+encodeURIComponent(mnc)+'&lac='+encodeURIComponent(lac)+'&cellid='+encodeURIComponent(cid);
+  try{
+    const r=await fetch(url);const j=await r.json();
+    if(j.result===200 && j.data && j.data.lat && j.data.lon){
+      setCell(j.data.lat,j.data.lon,j.data.range||0,'Mylnikov Open Cell Database',j.data.message||'',{radio:j.data.radio||radio,samples:j.data.samples||''});
+      $('cellStatus').innerHTML='<span class="ok">✅ Cell found • '+j.data.lat.toFixed(6)+', '+j.data.lon.toFixed(6)+' • range ~'+Math.round(+j.data.range||0)+' m</span>';
+      reverse(j.data.lat,j.data.lon);
+      return;
+    }
+  }catch(e){ console.log('Mylnikov failed', e); }
+  
+  // 3. Fallback: Known Tower Lock
+  const tlat=Number($('towerLat').value), tlon=Number($('towerLon').value);
+  if(Number.isFinite(tlat)&&Number.isFinite(tlon)&&Math.abs(tlat)<=90&&Math.abs(tlon)<=180 && tlat!==0){
+    setCell(tlat,tlon,0,'Known Tower Lock','Manual / Known Site',{radio:radio});
+    $('cellStatus').innerHTML='<span class="ok">🔒 Using Known Tower Lock (public DB has no record)</span>';
+    $('towerLockStatus').innerHTML='<span class="ok">🔒 Locked: '+tlat.toFixed(6)+', '+tlon.toFixed(6)+'</span>';
+    return;
+  }
+  
+  // 4. No result
+  $('cellStatus').innerHTML='<span class="err">❌ No public record for this cell.<br>→ Fill <b>Known Tower Lat/Lon</b> below and click <b>Lock Tower</b></span>';
+}
+$('lookup').onclick=analyze;
+$('imei').addEventListener('input', updateImeiModel);
+$('imei').addEventListener('change', updateImeiModel);
+['mcc','mnc','lac','cid'].forEach(id=>$(id).addEventListener('keydown',e=>{if(e.key==='Enter')analyze()}));
+$('radio').onchange=()=>{if($('lac').value&&$('cid').value)analyze()};
+$('example').onclick=()=>{$('mcc').value='410';$('mnc').value='01';$('lac').value='10249';$('cid').value='35585';$('ss').value='-85';$('cellStatus').textContent='Example loaded (Jazz style). Press Analyze.'};
+
+async function publicCellLookup(){
+  const mcc=$('mcc').value.trim(),mnc=String($('mnc').value.trim()).replace(/^0+/,'')||'0',area=$('lac').value.trim(),cid=$('cid').value.trim(),radio=$('radio').value;
+  if(!mcc||!mnc||!area||!cid){$('publicEvidence').innerHTML='<span class="err">Enter MCC, MNC, TAC/LAC and Cell ID first.</span>';return}
+  $('publicEvidence').textContent='Querying public cell database(s)…';$('publicMatches').innerHTML='';
+  const urls=[
+    'https://mcc-mnc.org/api/v1/cells?mcc='+encodeURIComponent(mcc)+'&mnc='+encodeURIComponent(mnc)+'&area='+encodeURIComponent(area)+'&cell='+encodeURIComponent(cid),
+    'https://mcc-mnc.org/api/v1/cells?mcc='+encodeURIComponent(mcc)+'&mnc='+encodeURIComponent(mnc)+'&cell='+encodeURIComponent(cid)
+  ];
+  let exact=null,fallback=[];
+  for(const u of urls){
+    try{
+      const r=await fetch(u,{cache:'no-store'});if(!r.ok)continue;
+      const j=await r.json();
+      if(Array.isArray(j.data)){
+        for(const x of j.data){
+          if(String(x.mcc)==String(mcc)&&String(x.mnc)==String(Number(mnc))&&String(x.cell)==String(cid)){
+            if(String(x.area)==String(area))exact=x;else fallback.push(x);
+          }
+        }
+      }
+    }catch(e){}
+  }
+  if(exact){
+    setCell(exact.lat,exact.lon,exact.range||0,'mcc-mnc.org exact cell','Public exact match',{radio:exact.radio||radio,samples:exact.samples||''});
+    $('publicEvidence').innerHTML='<span class="ok">✅ Exact public cell match.</span>';
+    $('publicMatches').innerHTML='<div class="status"><b>Exact:</b> MCC '+exact.mcc+' / MNC '+exact.mnc+' / TAC '+exact.area+' / ECI '+exact.cell+'<br>📍 '+exact.lat+', '+exact.lon+' • range '+(exact.range||0)+' m</div>';
+    reverse(exact.lat,exact.lon);return;
+  }
+  if(fallback.length){
+    $('publicEvidence').innerHTML='<span class="warn">⚠ Exact TAC+ECI not found, but same ECI records exist.</span>';
+    $('publicMatches').innerHTML=fallback.slice(0,8).map(x=>'<div class="status"><b>'+(x.radio||'')+' • Cell '+x.cell+'</b><br>MCC '+x.mcc+' / MNC '+x.mnc+' / TAC '+(x.area??'—')+'<br>📍 '+x.lat+', '+x.lon+' • range '+(x.range||0)+' m<br><button onclick="usePublic('+Number(x.lat)+','+Number(x.lon)+','+Number(x.range||0)+')">Use as estimate</button></div>').join('');
+  }else{
+    $('publicEvidence').innerHTML='<span class="warn">No exact public coordinate found.</span>';
+    $('publicMatches').innerHTML='<div class="status">Use imported BTS data or Known Tower Lock if you have coordinates.</div>';
+  }
+}
+window.usePublic=(lat,lon,range)=>{setCell(lat,lon,range,'Public estimate (non-exact)','Selected public record',{radio:$('radio').value});reverse(lat,lon)};
+$('publicLookup').onclick=publicCellLookup;
+$('cellMapper').onclick=()=>{const u='https://www.cellmapper.net/map?MCC='+encodeURIComponent($('mcc').value)+'&MNC='+encodeURIComponent(Number($('mnc').value||0))+'&type='+encodeURIComponent($('radio').value)+'&cellid='+encodeURIComponent($('cid').value);window.open(u,'_blank')};
+
+async function reverse(lat,lon){try{const r=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+encodeURIComponent(lat)+'&lon='+encodeURIComponent(lon));const j=await r.json();if(j.display_name&&cell){cell.place=j.display_name;$('place').textContent='Place: '+j.display_name+' • Source: '+cell.source;renderOverlay()}}catch(_){}}
+
+$('centerGps').onclick=()=>{if(gps){mapLocked=false;map.setView([gps.lat,gps.lon],17)}else $('gpsStatus').textContent='Get GPS first.'};
+$('centerCell').onclick=()=>{if(cell){mapLocked=true;map.setView([cell.lat,cell.lon],16)}else $('cellStatus').textContent='Analyze a cell first.'};
+$('unlockMap').onclick=()=>{mapLocked=false};
+$('mapFull').onclick=()=>{$('mapShell').classList.toggle('map-expanded');$('mapFull').textContent=$('mapShell').classList.contains('map-expanded')?'✕ Exit Full Map':'⛶ Full Map';setTimeout(()=>map.invalidateSize(),150)};
+$('mapExit').onclick=()=>{$('mapShell').classList.remove('map-expanded');$('mapFull').textContent='⛶ Full Map';setTimeout(()=>map.invalidateSize(),150)};
+$('google').onclick=()=>{const p=cell||gps;if(p)window.open('https://www.google.com/maps/search/?api=1&query='+p.lat+','+p.lon,'_blank')};
+$('street').onclick=()=>{if(cell)window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+cell.lat+','+cell.lon,'_blank')};
+$('directions').onclick=()=>{if(cell)window.open('https://www.google.com/maps/dir/?api=1'+(gps?'&origin='+gps.lat+','+gps.lon:'')+'&destination='+cell.lat+','+cell.lon,'_blank')};
+$('mapApp').onclick=()=>{if(cell)window.location.href='geo:'+cell.lat+','+cell.lon+'?q='+cell.lat+','+cell.lon};
+
+async function loadTowers(){
+  const p=gps||cell;if(!p){$('mapAddress').textContent='Get GPS or analyze a cell first.';return}
+  $('mapAddress').textContent='Loading public mapped towers…';
+  const q='[out:json][timeout:25];(nwr(around:5000,'+p.lat+','+p.lon+')["communication:mobile_phone"="yes"];nwr(around:5000,'+p.lat+','+p.lon+')["tower:type"="communication"];nwr(around:5000,'+p.lat+','+p.lon+')["man_made"="communications_tower"];);out center tags;';
+  try{
+    const r=await fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(q));
+    if(!r.ok)throw new Error('Tower service unavailable');
+    const j=await r.json();towerLayer.clearLayers();let n=0;
+    j.elements.forEach(el=>{
+      const lat=el.lat??el.center?.lat,lon=el.lon??el.center?.lon;
+      if(typeof lat!=='number'||typeof lon!=='number')return;
+      const t=el.tags||{},name=t.operator||t['operator:name']||'Operator not mapped';
+      L.marker([lat,lon]).bindPopup('<b>📡 '+name+'</b><br>'+(t.name||'')+'<br>'+lat.toFixed(7)+', '+lon.toFixed(7)).addTo(towerLayer);n++;
+    });
+    $('mapAddress').textContent=n+' public tower features loaded within ~5 km.';
+  }catch(e){$('mapAddress').textContent='Could not load public towers: '+e.message}
+}
+$('towerLoad').onclick=loadTowers;
+
+$('operatorFiles').onchange=async e=>{
+  if(!window.XLSX)return;
+  let added=0;
+  for(const f of e.target.files){
+    try{
+      const data=/\.csv$/i.test(f.name)?await f.text():await f.arrayBuffer();
+      const wb=XLSX.read(data,{type:/\.csv$/i.test(f.name)?'string':'array'});
+      wb.SheetNames.forEach(s=>{
+        XLSX.utils.sheet_to_json(wb.Sheets[s],{defval:''}).forEach(r=>{
+          const x=normalize(r,f.name,s);
+          if(x){operatorDb.push(x);added++}
+        });
+      });
+    }catch(err){console.error(err)}
+  }
+  $('operatorDbStatus').textContent=added+' new records imported • '+operatorDb.length+' total records available.';
+};
+$('clearOperatorDb').onclick=()=>{operatorDb=[];datasetLayer.clearLayers();$('operatorDbStatus').textContent='Imported operator dataset cleared.'};
+$('showDatasetSites').onclick=()=>{
+  const p=cell||gps;if(!p)return;
+  datasetLayer.clearLayers();
+  operatorDb.filter(x=>hav(p.lat,p.lon,x.lat,x.lon)<=5000).slice(0,1000).forEach(x=>
+    L.marker([x.lat,x.lon]).bindPopup('<b>📡 '+x.operator+'</b><br>LAC '+x.lac+' • Cell '+x.cid+'<br>'+x.lat.toFixed(7)+', '+x.lon.toFixed(7)+'<br>'+(x.site||'')).addTo(datasetLayer)
+  );
+  $('operatorDbStatus').textContent='Showing nearby imported dataset sites (max 1000).';
+};
+
+function rec(){if(!cell)return null;return{case_name:$('caseName').value||'Unnamed',note:$('caseNote').value,timestamp:new Date().toISOString(),mcc:cell.mcc,mnc:cell.mnc,lac:cell.lac,cell_id:cell.cid,enb:cell.enb,sector:cell.sector,latitude:cell.lat,longitude:cell.lon,range_m:cell.range,place:cell.place,source:cell.source,reference_latitude:gps?.lat||'',reference_longitude:gps?.lon||'',operator:cell.operator,radio:cell.radio,samples:cell.samples,distance:$('distance').textContent,bearing:$('bearing').textContent,direction:$('direction').textContent}}
+function history(){try{return JSON.parse(localStorage.getItem('markhorHistory')||'[]')}catch(_){return[]}}
+function renderHistory(){const h=history();$('historyStatus').textContent=h.length?h.length+' saved observation(s).':'No saved observations.';$('historyList').innerHTML=h.map((x,i)=>'<div class="status"><b>'+x.case_name+'</b><br>'+x.timestamp+'<br>LAC '+x.lac+' • Cell '+x.cell_id+'<br>'+x.latitude+', '+x.longitude+'<br>'+(x.place||'')+'<br><button onclick="delObs('+i+')">🗑️ Delete</button></div>').join('')}
+window.delObs=i=>{const h=history();h.splice(i,1);localStorage.setItem('markhorHistory',JSON.stringify(h));renderHistory()};
+$('saveObservation').onclick=()=>{const r=rec();if(!r){$('cellStatus').textContent='Analyze a cell first.';return}const h=history();h.unshift(r);localStorage.setItem('markhorHistory',JSON.stringify(h.slice(0,100)));renderHistory()};
+$('copyLocation').onclick=async()=>{const r=rec();if(!r)return;const t=Object.entries(r).map(([k,v])=>k+': '+v).join('\\n');try{await navigator.clipboard.writeText(t);$('cellStatus').innerHTML='<span class="ok">Copied.</span>'}catch(_){$('cellStatus').textContent=t}};
+$('exportCsv').onclick=()=>{const h=history();if(!h.length)return;const keys=Object.keys(h[0]),esc=v=>'"'+String(v??'').replace(/"/g,'""')+'"',csv=[keys.join(','),...h.map(r=>keys.map(k=>esc(r[k])).join(','))].join('\\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='markhor-observations.csv';a.click()};
+$('printReport').onclick=()=>{const r=rec();if(!r)return;const w=open('','_blank');if(!w)return;w.document.write('<pre style="font:14px Arial;white-space:pre-wrap">'+Object.entries(r).map(([k,v])=>k+': '+v).join('\\n')+'</pre>');w.print()};
+renderHistory();
+
+function convert(v,b){v=String(v||'').replace(/^0x/i,'');if(!v)return null;const n=b===16?parseInt(v,16):Number(v);return Number.isSafeInteger(n)&&n>=0?n:null}
+$('hexToDec').onclick=()=>{const n=convert($('hexCid').value,16);$('convertStatus').textContent=n===null?'Invalid HEX Cell ID.':'Cell ID DEC: '+n;if(n!==null)$('decCid').value=n};
+$('decToHex').onclick=()=>{const n=convert($('decCid').value,10);$('convertStatus').textContent=n===null?'Invalid DEC Cell ID.':'Cell ID HEX: '+n.toString(16).toUpperCase();if(n!==null)$('hexCid').value=n.toString(16).toUpperCase()};
+$('hexLacToDec').onclick=()=>{const n=convert($('hexLac').value,16);$('convertStatus').textContent=n===null?'Invalid HEX LAC/TAC.':'LAC/TAC DEC: '+n;if(n!==null)$('decLac').value=n};
+$('decLacToHex').onclick=()=>{const n=convert($('decLac').value,10);$('convertStatus').textContent=n===null?'Invalid DEC LAC/TAC.':'LAC/TAC HEX: '+n.toString(16).toUpperCase();if(n!==null)$('hexLac').value=n.toString(16).toUpperCase()};
+
+function tone(freq=650,dur=.08){audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=freq;g.gain.value=.035;o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur)}
+function scheduleBeep(){if(!beep||!gps||!cell)return;clearTimeout(beepTimer);const d=hav(gps.lat,gps.lon,cell.lat,cell.lon),delay=Math.max(90,Math.min(1600,d<100?120:d<500?260:d<1500?550:1100));beepTimer=setTimeout(()=>{tone(d<100?1000:700,d<100?.11:.07);scheduleBeep()},delay)}
+$('beepOn').onclick=()=>{beep=true;tone();$('beepStatus').textContent='Smart beep ON — faster when closer to target.';scheduleBeep()};
+$('beepOff').onclick=()=>{beep=false;clearTimeout(beepTimer);$('beepStatus').textContent='Smart beep OFF.'};
+$('imsi').oninput=()=>$('evidenceStatus').textContent='IMSI kept locally only.';
+$('imei').oninput=()=>$('evidenceStatus').textContent='IMEI kept locally only.';
+
+map.on('click',e=>{const{lat,lng}=e.latlng;$('mapAddress').textContent='Looking up address…';fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat='+lat+'&lon='+lng).then(r=>r.json()).then(j=>$('mapAddress').textContent=(j.display_name||'No address')+' • '+lat.toFixed(7)+', '+lng.toFixed(7)).catch(()=>$('mapAddress').textContent='Address lookup failed.')});
+setTimeout(()=>map.invalidateSize(),300);
+
+// Auto-load the provided Chandni Chowk / Al-Mujtaba Pride tower
+setTimeout(() => {
+  $('mcc').value = '410';
+  $('mnc').value = '01';
+  $('lac').value = '50406';
+  $('cid').value = '140605';
+  $('radio').value = 'LTE';
+  $('towerLat').value = '24.890422';
+  $('towerLon').value = '67.062591';
+  lockKnownTower();
+  $('cellStatus').innerHTML = '<span class="ok">✅ Tower Locked (Local Data)<br>Jazz LTE • LAC 50406 • Cell 140605<br>Al-Mujtaba Pride, Chandni Chowk, Karachi<br>24.890422, 67.062591</span>';
+  $('towerLockStatus').innerHTML = '<span class="ok">🔒 Locked: Al-Mujtaba Pride / Chandni Chowk<br>24.890422, 67.062591</span>';
+}, 600);
+</script>
+</body>
+</html>
