@@ -1,18 +1,31 @@
 {
   "name": "markhor-locator-desktop",
   "version": "1.0.0",
-  "description": "Markhor Locator for Windows",
+  "description": "Markhor Locator Windows desktop app",
   "main": "main.cjs",
-  "author": "Markhor Locator",
-  "license": "UNLICENSED",
-  "scripts": {"start": "electron .", "dist": "electron-builder --win nsis"},
-  "devDependencies": {"electron": "^35.0.0", "electron-builder": "^26.0.0"},
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
   "build": {
     "appId": "pk.markhor.locator",
     "productName": "Markhor Locator",
-    "directories": {"output": "dist"},
-    "files": ["main.cjs", "app/**/*"],
-    "win": {"target": [{"target": "nsis", "arch": ["x64"]}]},
-    "nsis": {"oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true}
+    "directories": { "output": "dist" },
+    "files": ["main.cjs", "app/**/*", "package.json"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "Markhor-Locator-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }
