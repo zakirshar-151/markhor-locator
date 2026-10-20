@@ -1,0 +1,44 @@
+name: Build Markhor Locator Windows Installer
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'www/index.html'
+      - 'desktop/**'
+      - '.github/workflows/build-windows-exe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package.json
+      - name: Copy shared app source into desktop package
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'www/index.html')) { throw 'Expected shared source www/index.html was not found.' }
+          New-Item -ItemType Directory -Force -Path 'desktop/app' | Out-Null
+          Copy-Item 'www/index.html' 'desktop/app/index.html' -Force
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm install
+      - name: Build Windows installer
+        working-directory: desktop
+        run: npm run dist
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Markhor-Locator-Windows-Installer
+          path: desktop/dist/*.exe
+          if-no-files-found: error
