@@ -24,6 +24,10 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+        
+      - name: Install Capacitor CLI and Android platform
+        run: npm install --no-save @capacitor/cli @capacitor/core @capacitor/android
+
 
       - name: Sync Capacitor
         run: npx cap sync android
